@@ -1,0 +1,56 @@
+#!/bin/sh
+
+cd /sys/class/power_supply 2>/dev/null ||
+	{ echo >&2 "The power_supply node doesn't exist in /sys -- not mounted?"; exit 1; }
+
+for x in *; do
+	[ -e "./$x/type" ] || continue
+	ONLINE=$(cat "./$x/online" 2>/dev/null)
+	PRESENT=$(cat "./$x/present" 2>/dev/null)
+	#TYPE=$(cat "./$x/type" 2>/dev/null)
+	STATUS=$(cat "./$x/status" 2>/dev/null)
+	CAPACITY=$(cat "./$x/capacity" 2>/dev/null)
+	HEALTH=$(cat "./$x/health" 2>/dev/null)
+	ICON="?"
+
+	if [ "$ONLINE" != 1 -a "$PRESENT" != 1 ]; then
+		COLOR='1;30'; ICON=✗
+	elif [ -z "$CAPACITY" ]; then
+		COLOR="1"; ICON=✓
+	else
+		if [ $CAPACITY -lt 25 ]; then
+			COLOR=31
+		elif [ $CAPACITY -lt 50 ]; then
+			COLOR=33
+		elif [ $CAPACITY -lt 100 ]; then
+			COLOR=32
+		else
+			COLOR=37
+		fi
+
+		case "$STATUS" in
+		"Charging")	COLOR="$COLOR;1"; ICON="+";
+			;;
+		"Full")		COLOR="$COLOR;1"; ICON=•;
+			;;
+		"Not charging")	ICON=•;
+			;;
+		"Discharging")	ICON=-;
+			;;
+		esac
+	fi
+
+	case "$HEALTH" in
+	Good|Unknown)	HEALTH=""
+		;;
+	esac
+
+	if [ -t 1 ]; then
+		C1="\e[0;${COLOR}m"
+		C2="\e[0m"
+	fi
+	
+	echo "$C1$ICON $x${CAPACITY:+ ($CAPACITY%)}${HEALTH:+ $HEALTH}$C2"
+done
+
+if [ -z "$ICON" ];then echo "No powers supply sensors; that's normal on a desktop.";fi
